@@ -1,0 +1,1 @@
+pyinstaller --noconsole --name="阴阳师辅助" --collect-all customtkinter main.py
