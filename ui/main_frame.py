@@ -78,63 +78,68 @@ class MainFrame(ctk.CTkFrame):
         self.pos_label = create_info_item("位置:", "(--, --)")
 
     def _create_left_panel(self):
-        """左侧面板"""
+        """左侧面板 — grid 布局确保按钮始终可见，配置区自适应滚动"""
         left_panel = ctk.CTkFrame(self, fg_color="transparent", width=300)
         left_panel.grid(row=1, column=0, sticky="nsew", padx=15, pady=15)
+
+        # grid 行分配：0=功能选择(固定) 1=配置区(伸缩) 2=调试(固定) 3=按钮(固定)
+        left_panel.grid_rowconfigure(0, weight=0)
+        left_panel.grid_rowconfigure(1, weight=1)
+        left_panel.grid_rowconfigure(2, weight=0)
+        left_panel.grid_rowconfigure(3, weight=0)
+        left_panel.grid_columnconfigure(0, weight=1)
 
         # === 1. 功能选择 ===
         func_card = ctk.CTkFrame(left_panel, fg_color=THEME["bg_card"], corner_radius=10,
                                  border_width=1, border_color=THEME["border"])
-        func_card.pack(fill="x", pady=(0, 15))
+        func_card.grid(row=0, column=0, sticky="ew", pady=(0, 10))
 
-        ctk.CTkLabel(func_card, text="功能选择", font=("微软雅黑", 14, "bold"), text_color=THEME["text_main"]).pack(anchor="w", padx=15, pady=(15, 5))
+        ctk.CTkLabel(func_card, text="功能选择", font=("微软雅黑", 14, "bold"),
+                     text_color=THEME["text_main"]).pack(anchor="w", padx=15, pady=(15, 5))
 
-        # === 修改点：直接从工厂获取所有支持的功能列表 ===
         available_modules = ModuleFactory.get_available_modules()
-        
         self.funct_var = ctk.StringVar(value="")
         self.funct_combobox = ctk.CTkComboBox(
             func_card,
-            values=available_modules, # <--- 动态数据源
-            command=self._on_function_change, # 绑定切换事件
+            values=available_modules,
+            command=self._on_function_change,
             width=260, height=38, font=("微软雅黑", 13), state="readonly",
             fg_color="#F9FAFB", border_color=THEME["border"], button_color=THEME["primary"]
         )
         self.funct_combobox.pack(padx=15, pady=(0, 15), fill="x")
 
-        # === 2. 动态配置容器 (最关键的部分) ===
-        self.config_card = ctk.CTkFrame(left_panel, fg_color=THEME["bg_card"], corner_radius=10,
-                                        border_width=1, border_color=THEME["border"])
-        self.config_card.pack(fill="x", pady=(0, 15))
+        # === 2. 可滚动配置区（填满剩余高度）===
+        # scrollbar_fg_color 与背景同色：内容不超出时滚动条轨道不显眼
+        self.config_card = ctk.CTkScrollableFrame(
+            left_panel,
+            fg_color=THEME["bg_card"],
+            corner_radius=10,
+            border_width=1,
+            border_color=THEME["border"],
+            scrollbar_fg_color=THEME["bg_card"],
+            scrollbar_button_color="#E5E7EB",
+            scrollbar_button_hover_color="#D1D5DB",
+        )
+        self.config_card.grid(row=1, column=0, sticky="nsew", pady=(0, 10))
 
-        ctk.CTkLabel(self.config_card, text="运行配置", font=("微软雅黑", 14, "bold"), text_color=THEME["text_main"]).pack(anchor="w", padx=15, pady=(15, 5))
+        ctk.CTkLabel(self.config_card, text="运行配置", font=("微软雅黑", 14, "bold"),
+                     text_color=THEME["text_main"]).pack(anchor="w", padx=15, pady=(15, 5))
 
-        # 这是一个空容器，具体的配置行由 Module 动态填充
         self.config_container = ctk.CTkFrame(self.config_card, fg_color="transparent")
         self.config_container.pack(fill="x", padx=15, pady=(0, 10))
 
-        # === 3. 统计卡片 (保留通用统计) ===
-        stats_card = ctk.CTkFrame(left_panel, fg_color=THEME["bg_card"], corner_radius=10,
-                                  border_width=1, border_color=THEME["border"])
-        stats_card.pack(fill="x", pady=(0, 15))
-        self.challenged_times_var = ctk.StringVar(value="0")
-        self.kill_total_var = ctk.StringVar(value="0")
-        stats_grid = ctk.CTkFrame(stats_card, fg_color="transparent")
-        stats_grid.pack(fill="x", padx=15, pady=15)
-        stats_grid.grid_columnconfigure(0, weight=1)
-        stats_grid.grid_columnconfigure(1, weight=1)
-        ctk.CTkLabel(stats_grid, text="已挑战", font=("微软雅黑", 11), text_color=THEME["text_sub"]).grid(row=0, column=0)
-        self.challenged_times_label = ctk.CTkLabel(stats_grid, textvariable=self.challenged_times_var,
-                                                   font=("微软雅黑", 20, "bold"), text_color=THEME["primary"])
-        self.challenged_times_label.grid(row=1, column=0)
-        ctk.CTkLabel(stats_grid, text="统计/掉落", font=("微软雅黑", 11), text_color=THEME["text_sub"]).grid(row=0, column=1)
-        self.kill_total_label = ctk.CTkLabel(stats_grid, textvariable=self.kill_total_var,
-                                             font=("微软雅黑", 20, "bold"), text_color="#10B981")
-        self.kill_total_label.grid(row=1, column=1)
+        # === 3. 调试开关（固定底部）===
+        debug_frame = ctk.CTkFrame(left_panel, fg_color="transparent")
+        debug_frame.grid(row=2, column=0, sticky="ew", padx=15, pady=(0, 4))
+        self.debug_mode_var = ctk.BooleanVar(value=False)
+        ctk.CTkCheckBox(
+            debug_frame, text="调试模式", variable=self.debug_mode_var, command=self._on_debug_change,
+            font=("微软雅黑", 12), text_color=THEME["text_sub"], checkbox_width=18, checkbox_height=18
+        ).pack(side="left")
 
-        # === 4. 按钮 & 调试 ===
+        # === 4. 开始/停止按钮（始终可见）===
         btn_frame = ctk.CTkFrame(left_panel, fg_color="transparent")
-        btn_frame.pack(side="bottom", fill="x", pady=(0, 15))
+        btn_frame.grid(row=3, column=0, sticky="ew", pady=(0, 10))
         self.start_btn = ctk.CTkButton(
             btn_frame, text="▶ 开始任务", command=self._on_start_click,
             height=45, corner_radius=22, fg_color=THEME["success"], hover_color=THEME["success_hover"],
@@ -148,14 +153,9 @@ class MainFrame(ctk.CTkFrame):
         )
         self.stop_btn.pack(side="right", expand=True, fill="x")
 
-        # 调试开关
-        debug_frame = ctk.CTkFrame(left_panel, fg_color="transparent")
-        debug_frame.pack(side="bottom", fill="x", padx=15, pady=(10, 10))
-        self.debug_mode_var = ctk.BooleanVar(value=False)
-        ctk.CTkCheckBox(
-            debug_frame, text="调试模式", variable=self.debug_mode_var, command=self._on_debug_change,
-            font=("微软雅黑", 12), text_color=THEME["text_sub"], checkbox_width=18, checkbox_height=18
-        ).pack(side="left")
+        # 统计变量（供各模块调用）
+        self.challenged_times_var = ctk.StringVar(value="0")
+        self.kill_total_var = ctk.StringVar(value="0")
 
     def _create_right_log_panel(self):
         log_panel = ctk.CTkFrame(self, fg_color="transparent")

@@ -5,6 +5,7 @@ from ui.modules.soul_king_panel import SoulKingPanel
 # 未来添加新功能只需在这里导入
 from ui.modules.realm_raid_panel import RealmRaidPanel
 from ui.modules.event_tower_panel import EventTowerPanel
+from ui.modules.huajuan_panel import ShuaHuajuanPanel
 
 class ModuleFactory:
     """
@@ -17,6 +18,7 @@ class ModuleFactory:
         # 新功能在此处注册，例如: "御灵": YuLingPanel
         "结界突破": RealmRaidPanel,
         "活动爬塔": EventTowerPanel,
+        "刷绘卷": ShuaHuajuanPanel,
     }
 
     @classmethod
