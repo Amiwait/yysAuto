@@ -44,22 +44,44 @@ class Kun28Panel(BaseModule):  # 继承 BaseModule
     def __init__(self, main_frame, game_window):
         super().__init__(main_frame, game_window)
         self.module_name = "困28"
+        self.folder_name = "kun28"
         
         # 统计变量
         self.challenged_levels = 0
         self.total_killed_monsters = 0
         self.total_killed_boss = 0
         self.total_collected_rewards = 0
+    
+    def render_config_ui(self, parent_frame):
+        """[实现] 渲染困28的专属配置"""
+        # 1. 挑战次数
+        self._create_config_row(parent_frame, "挑战次数 (空=无限)", "challenge_count", "")
+        
+        # 2. 结算等待
+        self._create_config_row(parent_frame, "结算等待 (秒)", "settle_wait", "5")
+        
+        # 3. 小怪等待 (特殊双输入框，手动创建)
+        row = ctk.CTkFrame(parent_frame, fg_color="transparent")
+        row.pack(fill="x", pady=5)
+        
+        ctk.CTkLabel(row, text="小怪等待 (秒)", font=("微软雅黑", 12), text_color="#6B7280", width=120, anchor="w").pack(side="left")
+        
+        self.config_vars["wait_max"] = ctk.StringVar(value="5.0")
+        self.config_vars["wait_min"] = ctk.StringVar(value="1.0")
+        
+        ctk.CTkEntry(row, textvariable=self.config_vars["wait_max"], width=50, height=30, font=("微软雅黑", 12), fg_color="#F9FAFB").pack(side="right")
+        ctk.CTkLabel(row, text="~", text_color="#6B7280").pack(side="right", padx=5)
+        ctk.CTkEntry(row, textvariable=self.config_vars["wait_min"], width=50, height=30, font=("微软雅黑", 12), fg_color="#F9FAFB").pack(side="right")
 
     def _random_wait_after_monster_kill(self):
         """小怪击杀后随机等待"""
-        if not self.is_running:
-            return
-        min_wait, max_wait = self.main_frame.get_monster_wait_range()
-        wait_time = round(random.uniform(min_wait, max_wait), 1)
-        start_time = time.time()
-        while self.is_running and (time.time() - start_time) < wait_time:
-            time.sleep(0.1)
+        try:
+            min_w = float(self.config_vars["wait_min"].get())
+            max_w = float(self.config_vars["wait_max"].get())
+            wait_time = round(random.uniform(min_w, max_w), 1)
+            time.sleep(wait_time)
+        except:
+            time.sleep(1.0)
 
     def _is_interference_scene(self):
         """判断是否处于干扰场景（少女与面具对话框/探索页面）"""
@@ -72,14 +94,18 @@ class Kun28Panel(BaseModule):  # 继承 BaseModule
         
         # 检测是否在少女与面具对话框
         dialog_template = "assets/templates/girl_mask_dialog.png"
-        is_dialog, _, _ = match_template(screen, dialog_template, current_size, threshold=0.78)
+        is_dialog, _, _ = match_template(
+            screen, self._img("dialog.png"), current_size, threshold=0.78
+        )
         if is_dialog:
             return True
         
         # 检测是否在探索页面
         exploration_template = "assets/templates/exploration_map_bottom_icons.png"
         logger.log(f"检测是否在探索界面", "debug")
-        is_exploration, _, _ = match_template(screen, exploration_template, current_size, threshold=0.65)
+        is_exploration, _, _ = match_template(
+            screen, self._img("explore_icon.png"), current_size, threshold=0.65
+        )
         if is_exploration:
             return True
         
@@ -123,8 +149,8 @@ class Kun28Panel(BaseModule):  # 继承 BaseModule
         # 这样 match_template 内部计算缩放比例时，才会得到正确的 1.0 (或实际缩放比)，而不是 0.44
         is_found, score, reward_pos = match_template(
             screen_cropped, 
-            COLLECT_REWARD_TEMPLATE, 
-            (window_width, window_height),  # <--- 这里改回完整窗口尺寸
+            self._img("reward.png"),  # <--- 使用新路径
+            (window_width, window_height),
             threshold=0.8
         )
         
@@ -224,9 +250,9 @@ class Kun28Panel(BaseModule):  # 继承 BaseModule
         # 注意：这里使用之前的 COLLECT_REWARD_TEMPLATE 常量
         points = match_all_template(
             screen, 
-            COLLECT_REWARD_TEMPLATE, 
+            self._img("reward.png"),  # <--- 使用新路径
             current_size, 
-            threshold= 0.8
+            threshold=0.8
         )
         return len(points)
     
@@ -448,15 +474,18 @@ class Kun28Panel(BaseModule):  # 继承 BaseModule
         
         # === 1. [修改] 优先检测小怪 ===
         monster_template = "assets/templates/battle_monster_marker.png"
-        is_monster, score_m, monster_pos = match_template(screen, monster_template, current_size, threshold=threshold)
-        
+        is_monster, score_m, monster_pos = match_template(
+            screen, self._img("monster.png"), current_size, threshold=threshold
+        )
         if is_monster and monster_pos:
             logger.log(f"[调试] 视觉识别: 发现小怪 (分数:{score_m:.2f})", "debug")
             return ("normal", monster_pos, score_m)
 
         # === 2. [修改] 其次检测 BOSS ===
         # 只有当屏幕上找不到任何小怪时，才会去检测 BOSS
-        is_boss, score_b, boss_pos = match_template(screen, BOSS_MARKER_TEMPLATE, current_size, threshold=threshold - 0.15)
+        is_boss, score_b, boss_pos = match_template(
+            screen, self._img("boss.png"), current_size, threshold=threshold - 0.15
+        )
         
         if is_boss and boss_pos:
             logger.log(f"[调试] 视觉识别: 发现BOSS (分数:{score_b:.2f})", "debug")
@@ -535,7 +564,9 @@ class Kun28Panel(BaseModule):  # 继承 BaseModule
         if result is None or result[0] is None:
             return False
         screen, current_size = result
-        is_in_level, _, _ = match_template(screen, LEVEL_ENTRY_TEMPLATE, current_size, threshold=0.80)
+        is_in_level, _, _ = match_template(
+            screen, self._img("entry.png"), current_size, threshold=0.80
+        )
         return is_in_level
 
     def start_task(self):
@@ -571,17 +602,17 @@ class Kun28Panel(BaseModule):  # 继承 BaseModule
 
     def run(self):
         # 获取配置参数
-        target_count = self.main_frame.get_challenge_count()
+        count_str = self.config_vars["challenge_count"].get()
+        target_count = int(count_str) if count_str else None
         if target_count is None:
             logger.log("模式: 无限挑战", "info")
         else:
             logger.log(f"模式: 目标 {target_count} 次", "info")
 
         while self.is_running:
-            # 检查次数限制
             if target_count is not None and self.challenged_levels >= target_count:
                 logger.log("已达到设定挑战次数", "success")
-                break
+                break 
 
             logger.log(f"--- 开始第 {self.challenged_levels + 1} 次探索 ---", "info")
             
@@ -625,24 +656,23 @@ class Kun28Panel(BaseModule):  # 继承 BaseModule
         screen, current_size = result
         current_width, current_height = current_size
         
-        dialog_template = "assets/templates/girl_mask_dialog.png"
-        exploration_template = "assets/templates/exploration_map_bottom_icons.png"
-        is_in_dialog, val, _ = match_template(screen, dialog_template, current_size, threshold=0.78)
+
+        is_in_dialog, val, _ = match_template(screen, self._img("dialog.png"), current_size, threshold=0.78)
         logger.log(f"“少女与面具”对话框,匹配分数:{val}", "debug")
         if is_in_dialog:
             self._click_exploration_button(current_width, current_height)
             time.sleep(random.uniform(2.0, 3.5))
             return self._check_level_entry(current_width, current_height)
             
-        is_in_exploration, val, _ = match_template(screen, exploration_template, current_size, threshold=0.7)
-        logger.log(f"探索场景,匹配分数:{val}", "debug")
+        is_in_exploration = self.is_in_exploration()
+        
         if is_in_exploration:
             self._click_kun28_button(current_width, current_height)
             time.sleep(random.uniform(2.0, 4.0))
             result_new = capture_window(self.game_window.hwnd)
             if result_new and result_new[0] is not None:
                 screen_new, _ = result_new
-                is_now_in_dialog, _, _ = match_template(screen_new, dialog_template, current_size, threshold=0.78)
+                is_now_in_dialog, _, _ = match_template(screen_new,self._img("dialog.png") , current_size, threshold=0.78)
                 if is_now_in_dialog:
                     self._click_exploration_button(current_width, current_height)
                     time.sleep(random.uniform(2.0, 3.5))
@@ -660,11 +690,13 @@ class Kun28Panel(BaseModule):  # 继承 BaseModule
         """
         if not self.is_running:
             return
-
+        try:
+            wait_s = float(self.config_vars["settle_wait"].get())
+        except:
+            wait_s = 5.0
         # 预设等待 (等待战斗结束黑屏转场)
-        wait_seconds = self.main_frame.get_settle_wait_time()
-        logger.log(f"等待战斗结算动画 ({wait_seconds}s)...", "debug")
-        time.sleep(wait_seconds)
+        logger.log(f"等待战斗结算动画 ({wait_s}s)...", "debug")
+        time.sleep(wait_s)
         
         logger.log("开始监测结算状态 (目标: 返回关卡界面)...", "debug")
         start_time = time.time()
@@ -705,8 +737,12 @@ class Kun28Panel(BaseModule):  # 继承 BaseModule
             
             # 4. 检测结算界面 (同时检测 Scene2 和 Scene1，确保覆盖所有结算阶段)
             # 用户逻辑：匹配 scene2_template 证明还在结算
-            is_scene2, score2, _ = match_template(screen, scene2_template, current_size, threshold=0.75)
-            is_scene1, score1, _ = match_template(screen, scene1_template, current_size, threshold=0.75)
+            is_scene2, score2, _ = match_template(
+                screen, self._common_img("settlement_panel.png"), current_size, threshold=0.75
+            )
+            is_scene1, score1, _ = match_template(
+                screen, self._common_img("settlement.png"), current_size, threshold=0.75
+            )
             
             if is_scene2 or is_scene1:
                 debug_info = f"Scene2({score2:.2f})" if is_scene2 else f"Scene1({score1:.2f})"
@@ -775,7 +811,7 @@ class Kun28Panel(BaseModule):  # 继承 BaseModule
         if result is None or result[0] is None:
             return False
         screen, current_size = result
-        is_in_level, _, _ = match_template(screen, "assets/templates/kun28_level_entry_bottom_bar.png", current_size, threshold=0.80)
+        is_in_level, _, _ = match_template(screen, self._img("entry.png"), current_size, threshold=0.80)
         return is_in_level
     
     TREASURE_TEMPLATE = "assets/templates/exploration_treasure.png"
@@ -798,7 +834,7 @@ class Kun28Panel(BaseModule):  # 继承 BaseModule
         # 注意：你需要把上传的宝箱图片保存为 assets/templates/exploration_treasure.png
         is_match, score, pos = match_template(
             screen, 
-            self.TREASURE_TEMPLATE, 
+            self._img("treasure.png"), 
             current_size, 
             threshold=0.75
         )

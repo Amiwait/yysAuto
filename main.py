@@ -1,64 +1,51 @@
 import customtkinter as ctk
-from ui.main_frame import MainFrame
-from ui.window_selector import WindowSelector
-from ui.modules.kun28_panel import Kun28Panel
+import pyautogui
 from core.game_window import GameWindow
-from utils.logger import logger
-
-# 修改 yysAuto/main.py
-import customtkinter as ctk
 from ui.main_frame import MainFrame
-from ui.window_selector import WindowSelector
-from ui.modules.kun28_panel import Kun28Panel
-from core.game_window import GameWindow
 from utils.logger import logger
-
-class ModuleManager:
-    def __init__(self, main_frame, game_window):
-        self.main_frame = main_frame
-        self.modules = {
-            "困28": Kun28Panel(main_frame, game_window),
-            # 未来这里可以加: "自动御魂": SoulPanel(main_frame, game_window)
-        }
-        self.current_module = None
-        
-        # 绑定 UI 事件
-        self.main_frame.bind_start_command(self.on_start)
-        self.main_frame.bind_stop_command(self.on_stop)
-
-    def on_start(self):
-        selected_name = self.main_frame.get_selected_function()
-        module = self.modules.get(selected_name)
-        
-        if module:
-            self.current_module = module
-            self.current_module.start()
-        else:
-            logger.log(f"功能 [{selected_name}] 尚未实现", "warn")
-
-    def on_stop(self):
-        if self.current_module:
-            self.current_module.stop()
 
 def main():
+    # 1. 关闭 PyAutoGUI 的故障安全保护 (防止鼠标移到角落报错)
+    pyautogui.FAILSAFE = False 
+    
+    # 2. 设置界面主题
     ctk.set_appearance_mode("light")
     ctk.set_default_color_theme("blue")
-
+    
+    # 3. 创建主窗口
     root = ctk.CTk()
-    root.title("阴阳师辅助工具 v0.2")
-    root.geometry("1100x650")
-
+    root.title("阴阳师自动化辅助")
+    root.geometry("1100x750")
+    
+    # === [关键修改] 先初始化 GameWindow ===
     game_window = GameWindow()
-    main_frame = MainFrame(root)
+    
+    # === [关键修改] 将 game_window 传给 MainFrame ===
+    main_frame = MainFrame(root, game_window)
     main_frame.pack(fill="both", expand=True)
 
-    # 初始化功能模块
-    WindowSelector(main_frame, game_window)
-    ModuleManager(main_frame, game_window) # 使用管理器替代直接注册
-    #logger.set_level('debug')
-
+    # 4. 绑定日志输出
+    # 让 logger 把消息转发给 main_frame.append_log
     logger.add_listener(main_frame.append_log)
     
+    # 5. 绑定自动检测按钮事件
+    def on_detect_click():
+        logger.log("开始检测游戏窗口...", "info")
+        if game_window.try_auto_set():
+            game_window.activate()
+            main_frame.update_window_info(
+                game_window.title, 
+                (game_window.width, game_window.height), 
+                (game_window.left, game_window.top)
+            )
+            logger.log(f"成功绑定: {game_window.title}", "success")
+        else:
+            main_frame.reset_window_info()
+            logger.log("未找到游戏窗口 (请打开MuMu模拟器)", "error")
+            
+    main_frame.bind_window_detect_command(on_detect_click)
+
+    # 6. 启动主循环
     logger.log("程序就绪", "info")
     root.mainloop()
 

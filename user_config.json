@@ -1,0 +1,7 @@
+{
+    "活动爬塔": {
+        "battle_min": "10.0",
+        "interval_min": "0.5",
+        "interval_max": "2"
+    }
+}
