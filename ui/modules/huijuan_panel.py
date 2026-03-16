@@ -122,12 +122,8 @@ class ShuaHuajuanPanel(BaseModule):
                     f"困28完成，本轮击杀 {monsters_killed} 只，累计 {self.monster_count}", "success"
                 )
 
-                # 3. 检查结界突破券（预留，暂不实现）
-                ticket_result = self._check_realm_ticket()
-                logger.log(f"结界突破券: {ticket_result}", "debug")
-
                 # 4. 判断是否进行结界突破
-                if self._should_do_realm_raid(ticket_result):
+                if self._should_do_realm_raid():
                     logger.log("满足结界突破条件，开始结界突破...", "info")
                     if self._rr_do_single_raid():
                         self.realm_raid_count += 1
@@ -144,15 +140,9 @@ class ShuaHuajuanPanel(BaseModule):
         )
 
     # ── 结界突破条件判断（预留）────────────────────────────────────────────────
-
-    def _check_realm_ticket(self):
-        """检查结界突破券数量（暂不实现，返回 None）。
-        TODO: 实现 OCR 读取后补充此处逻辑。"""
-        return None
-
-    def _should_do_realm_raid(self, ticket_result) -> bool:  # noqa: ARG002
+    def _should_do_realm_raid(self) -> bool:  # noqa: ARG002
         """判断是否应当进行结界突破（暂时始终返回 False）。
-        TODO: 根据 ticket_result 判断条件后启用。"""
+        TODO:检查当前界面,是否匹配assets\templates\realm_raid\tickets_num.png"""
         return False
 
     # ══════════════════════════════════════════════════════════════════════════
@@ -218,6 +208,7 @@ class ShuaHuajuanPanel(BaseModule):
                 detect = self._k28_detect_monster_or_boss()
                 if detect and detect[0] == "boss":
                     logger.log(f"已击杀 {monster_killed} 只，发现 BOSS，提前进入 BOSS 战", "info")
+
                     break
                 else:
                     logger.log("无法继续击杀小怪，本关放弃", "warn")
@@ -227,7 +218,6 @@ class ShuaHuajuanPanel(BaseModule):
             return monster_killed, False
 
         time.sleep(random.uniform(2.5, 8.0))
-        logger.log("开始挑战 BOSS", "info")
         if self._k28_click_monster("boss") and self.is_running:
             self._k28_wait_settlement()
             monster_killed += 1
