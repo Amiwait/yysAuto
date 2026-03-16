@@ -608,6 +608,8 @@ class Kun28Panel(BaseModule):  # 继承 BaseModule
             logger.log("模式: 无限挑战", "info")
         else:
             logger.log(f"模式: 目标 {target_count} 次", "info")
+        
+        re_enter_num = 0  # 初始化重试进入探索次数
 
         while self.is_running:
             if target_count is not None and self.challenged_levels >= target_count:
@@ -618,9 +620,16 @@ class Kun28Panel(BaseModule):  # 继承 BaseModule
             
             # 进入关卡逻辑
             if not self._enter_level():
+                # 没有成功进入探索，重试3次
+                if re_enter_num <= 3:
+                    re_enter_num += 1
+                else:
+                    self.is_running = False
                 if self.is_running:
                     time.sleep(1.5)
                 continue
+            else:
+                re_enter_num = 0
 
             # 关卡内战斗逻辑
             if self._fight_in_level() and self.is_running:
